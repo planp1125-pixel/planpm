@@ -3,6 +3,7 @@ import './globals.css';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase';
+import { AppContent } from '@/components/layout/app-content';
 
 export const metadata: Metadata = {
   title: 'LabTrack',
@@ -23,9 +24,11 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <FirebaseClientProvider>
-          <MainLayout>
-            {children}
-          </MainLayout>
+          <AppContent>
+            <MainLayout>
+              {children}
+            </MainLayout>
+          </AppContent>
         </FirebaseClientProvider>
         <Toaster />
       </body>
