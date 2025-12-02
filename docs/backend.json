@@ -1,0 +1,270 @@
+{
+  "entities": {
+    "Instrument": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Instrument",
+      "type": "object",
+      "description": "Represents an instrument in a lab.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Instrument entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the instrument."
+        },
+        "model": {
+          "type": "string",
+          "description": "Model of the instrument."
+        },
+        "manufacturer": {
+          "type": "string",
+          "description": "Manufacturer of the instrument."
+        },
+        "serialNumber": {
+          "type": "string",
+          "description": "Serial number of the instrument."
+        },
+        "location": {
+          "type": "string",
+          "description": "Location of the instrument within the lab."
+        },
+        "installationDate": {
+          "type": "string",
+          "description": "Date when the instrument was installed.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "model",
+        "manufacturer",
+        "serialNumber"
+      ]
+    },
+    "MaintenanceSchedule": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MaintenanceSchedule",
+      "type": "object",
+      "description": "Represents a scheduled maintenance task for an instrument.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the MaintenanceSchedule entity."
+        },
+        "instrumentId": {
+          "type": "string",
+          "description": "Reference to Instrument. (Relationship: Instrument 1:N MaintenanceSchedule)"
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "Date when the maintenance is due.",
+          "format": "date-time"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the maintenance task."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the maintenance task (e.g., scheduled, in progress, completed)."
+        }
+      },
+      "required": [
+        "id",
+        "instrumentId",
+        "dueDate",
+        "description",
+        "status"
+      ]
+    },
+    "MaintenanceRecord": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MaintenanceRecord",
+      "type": "object",
+      "description": "Represents a record of a completed maintenance task.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the MaintenanceRecord entity."
+        },
+        "scheduleId": {
+          "type": "string",
+          "description": "Reference to MaintenanceSchedule. (Relationship: MaintenanceSchedule 1:1 MaintenanceRecord)"
+        },
+        "completionDate": {
+          "type": "string",
+          "description": "Date when the maintenance was completed.",
+          "format": "date-time"
+        },
+        "result": {
+          "type": "string",
+          "description": "Result of the maintenance task."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes about the maintenance task."
+        },
+        "fileIds": {
+          "type": "array",
+          "description": "References to Files. (Relationship: File N:N MaintenanceRecord)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "scheduleId",
+        "completionDate",
+        "result"
+      ]
+    },
+    "File": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "File",
+      "type": "object",
+      "description": "Represents a file uploaded as part of a maintenance record.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the File entity."
+        },
+        "fileName": {
+          "type": "string",
+          "description": "Name of the file."
+        },
+        "fileType": {
+          "type": "string",
+          "description": "Type of the file (e.g., image/jpeg, application/pdf)."
+        },
+        "fileSize": {
+          "type": "number",
+          "description": "Size of the file in bytes."
+        },
+        "uploadDate": {
+          "type": "string",
+          "description": "Date when the file was uploaded.",
+          "format": "date-time"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "Path to the file on the server or cloud storage."
+        }
+      },
+      "required": [
+        "id",
+        "fileName",
+        "fileType",
+        "fileSize",
+        "uploadDate",
+        "filePath"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/instruments/{instrumentId}",
+        "definition": {
+          "entityName": "Instrument",
+          "schema": {
+            "$ref": "#/backend/entities/Instrument"
+          },
+          "description": "Stores instrument details.  Each instrument has its own document.",
+          "params": [
+            {
+              "name": "instrumentId",
+              "description": "Unique identifier for the instrument."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/instruments/{instrumentId}/maintenanceSchedules/{scheduleId}",
+        "definition": {
+          "entityName": "MaintenanceSchedule",
+          "schema": {
+            "$ref": "#/backend/entities/MaintenanceSchedule"
+          },
+          "description": "Stores maintenance schedules for each instrument. Uses path-based ownership: each schedule is a subcollection of the instrument it belongs to. Includes denormalized instrumentId for authorization independence.",
+          "params": [
+            {
+              "name": "instrumentId",
+              "description": "Unique identifier for the instrument."
+            },
+            {
+              "name": "scheduleId",
+              "description": "Unique identifier for the maintenance schedule."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/instruments/{instrumentId}/maintenanceSchedules/{scheduleId}/maintenanceRecords/{recordId}",
+        "definition": {
+          "entityName": "MaintenanceRecord",
+          "schema": {
+            "$ref": "#/backend/entities/MaintenanceRecord"
+          },
+          "description": "Stores maintenance records for each maintenance schedule. Uses path-based ownership: each record is a subcollection of the maintenance schedule it belongs to. Includes denormalized instrumentId and scheduleId for authorization independence.",
+          "params": [
+            {
+              "name": "instrumentId",
+              "description": "Unique identifier for the instrument."
+            },
+            {
+              "name": "scheduleId",
+              "description": "Unique identifier for the maintenance schedule."
+            },
+            {
+              "name": "recordId",
+              "description": "Unique identifier for the maintenance record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/files/{fileId}",
+        "definition": {
+          "entityName": "File",
+          "schema": {
+            "$ref": "#/backend/entities/File"
+          },
+          "description": "Stores metadata for files uploaded for maintenance records.",
+          "params": [
+            {
+              "name": "fileId",
+              "description": "Unique identifier for the file."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "role",
+          "schema": {
+            "$ref": "#/backend/entities/Instrument"
+          },
+          "description": "A document's existence in this collection grants admin privileges to the user identified by {userId}. Uses Existence over Content for simplicity and security.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who is an admin."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the LabTrack application's core features, prioritizing authorization independence, clarity, and scalability. It uses a hierarchical path-based ownership for Instruments and their associated Maintenance Schedules and Records. This structure ensures that security rules can be written without relying on `get()` calls, thus enabling atomic operations and improving debuggability.  The design incorporates denormalization where necessary to maintain authorization independence. The file storage will use Firebase Storage, but the metadata is stored in firestore.  The structure uses homogeneous security postures by segregating data types into distinct collections, with each collection enforcing a consistent set of security rules. This segregation simplifies the security rules and reduces the risk of unintended access.  To support QAPs, the design leverages path-based ownership, allowing for efficient and secure listing of resources owned by a specific user/instrument. The Predictive Maintenance Advisor feature does not directly influence the database structure. The dashboard primarily uses the data present in these collections, so no special data structures are required. Role-based access control is implemented using a dedicated collection for admin roles, enabling secure management of application resources. No Custom Claims are used."
+  }
+}
