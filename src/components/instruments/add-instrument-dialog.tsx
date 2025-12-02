@@ -265,7 +265,7 @@ export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialo
                 )}
               />
             </div>
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-2 gap-4">
                 <FormField
                     control={form.control}
                     name="frequency"
@@ -280,6 +280,26 @@ export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialo
                         </FormControl>
                         <SelectContent>
                             {frequencies.map(freq => <SelectItem key={freq} value={freq}>{freq}</SelectItem>)}
+                        </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="imageId"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Instrument Image</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                            <SelectTrigger>
+                            <SelectValue placeholder="Select an image" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {PlaceHolderImages.map(img => <SelectItem key={img.id} value={img.id}>{img.description}</SelectItem>)}
                         </SelectContent>
                         </Select>
                         <FormMessage />
