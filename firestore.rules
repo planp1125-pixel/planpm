@@ -83,9 +83,9 @@ service cloud.firestore {
     match /instruments/{instrumentId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
 
       /**
        * @description Stores maintenance schedules for an instrument. Writable only by admins.
