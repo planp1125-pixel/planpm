@@ -65,9 +65,9 @@ export function InstrumentClientPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Input
-          placeholder="Filter instruments by name..."
-          value={(table.getColumn('name')?.getFilterValue() as string) ?? ''}
-          onChange={(event) => table.getColumn('name')?.setFilterValue(event.target.value)}
+          placeholder="Filter instruments by Eqp. ID..."
+          value={(table.getColumn('eqpId')?.getFilterValue() as string) ?? ''}
+          onChange={(event) => table.getColumn('eqpId')?.setFilterValue(event.target.value)}
           className="max-w-sm"
         />
         <Button onClick={() => setAddDialogOpen(true)}>Add Instrument</Button>
@@ -142,3 +142,5 @@ export function InstrumentClientPage() {
     </div>
   );
 }
+
+    

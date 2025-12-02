@@ -20,23 +20,28 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, addWeeks, addMonths, addYears } from 'date-fns';
 import { useFirestore, addDocumentNonBlocking } from '@/firebase';
 import { collection, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import type { InstrumentStatus, NewInstrument } from '@/lib/types';
+import type { InstrumentStatus, MaintenanceFrequency, InstrumentType } from '@/lib/types';
 
+const instrumentTypes: InstrumentType[] = ["Lab Balance", "Scale", "pH Meter", "Tap Density Tester", "UV-Vis Spectrophotometer", "GC", "Spectrometer"];
+const frequencies: MaintenanceFrequency[] = ['Weekly', 'Monthly', '3 Months', '6 Months', '1 Year'];
+const statuses: InstrumentStatus[] = ['Operational', 'AMC', 'PM', 'Out of Service'];
 
 const formSchema = z.object({
-  name: z.string().min(1, 'Name is required.'),
+  eqpId: z.string().min(1, 'Equipment ID is required.'),
+  instrumentType: z.string().min(1, 'Instrument type is required.'),
   model: z.string().min(1, 'Model is required.'),
   serialNumber: z.string().min(1, 'Serial number is required.'),
   location: z.string().min(1, 'Location is required.'),
-  status: z.enum(['Operational', 'Needs Maintenance', 'Out of Service', 'Archived']),
-  installationDate: z.date({
-    required_error: 'Installation date is required.',
+  status: z.enum(['Operational', 'AMC', 'PM', 'Out of Service']),
+  scheduleDate: z.date({
+    required_error: 'Schedule date is required.',
   }),
+  frequency: z.string().min(1, 'Frequency is required.'),
   imageId: z.string().min(1, "Please select an image"),
 });
 
@@ -47,6 +52,23 @@ interface AddInstrumentDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const getNextMaintenanceDate = (startDate: Date, frequency: MaintenanceFrequency): Date => {
+    switch (frequency) {
+        case 'Weekly':
+            return addWeeks(startDate, 1);
+        case 'Monthly':
+            return addMonths(startDate, 1);
+        case '3 Months':
+            return addMonths(startDate, 3);
+        case '6 Months':
+            return addMonths(startDate, 6);
+        case '1 Year':
+            return addYears(startDate, 1);
+        default:
+            return startDate;
+    }
+};
+
 export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const firestore = useFirestore();
@@ -55,11 +77,13 @@ export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialo
   const form = useForm<AddInstrumentFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: '',
+      eqpId: '',
+      instrumentType: '',
       model: '',
       serialNumber: '',
       location: '',
       status: 'Operational',
+      frequency: '',
       imageId: '',
     },
   });
@@ -68,13 +92,15 @@ export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialo
     if (!firestore) return;
     setIsLoading(true);
 
+    const nextMaintenanceDate = getNextMaintenanceDate(values.scheduleDate, values.frequency as MaintenanceFrequency);
+
     const newInstrumentData = {
       ...values,
       status: values.status as InstrumentStatus,
-      installationDate: Timestamp.fromDate(values.installationDate),
-      // Set sensible defaults for maintenance dates
-      lastMaintenanceDate: Timestamp.fromDate(values.installationDate),
-      nextMaintenanceDate: Timestamp.fromDate(new Date(values.installationDate.getTime() + 6 * 30 * 24 * 60 * 60 * 1000)), // 6 months later
+      instrumentType: values.instrumentType as InstrumentType,
+      frequency: values.frequency as MaintenanceFrequency,
+      scheduleDate: Timestamp.fromDate(values.scheduleDate),
+      nextMaintenanceDate: Timestamp.fromDate(nextMaintenanceDate),
     };
 
     const instrumentsColRef = collection(firestore, 'instruments');
@@ -82,13 +108,12 @@ export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialo
       .then(() => {
         toast({
           title: 'Instrument Added',
-          description: `${values.name} has been added to the inventory.`,
+          description: `${values.eqpId} has been added to the inventory.`,
         });
         form.reset();
         onOpenChange(false);
       })
       .catch((err) => {
-        // Error is handled by the global error handler via non-blocking update
         console.error(err);
       })
       .finally(() => {
@@ -98,26 +123,48 @@ export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialo
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Add New Instrument</DialogTitle>
           <DialogDescription>Fill in the details below to add a new instrument to the inventory.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Instrument Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Clinical Centrifuge" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
+            <div className="grid grid-cols-2 gap-4">
+                <FormField
+                control={form.control}
+                name="eqpId"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Equipment ID</FormLabel>
+                    <FormControl>
+                        <Input placeholder="e.g., QC-001" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                    control={form.control}
+                    name="instrumentType"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Instrument Type</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a type" />
+                            </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                            {instrumentTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            </div>
             <div className="grid grid-cols-2 gap-4">
                 <FormField
                 control={form.control}
@@ -173,10 +220,7 @@ export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialo
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Operational">Operational</SelectItem>
-                        <SelectItem value="Needs Maintenance">Needs Maintenance</SelectItem>
-                        <SelectItem value="Out of Service">Out of Service</SelectItem>
-                        <SelectItem value="Archived">Archived</SelectItem>
+                         {statuses.map(status => <SelectItem key={status} value={status}>{status}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -185,10 +229,10 @@ export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialo
               />
               <FormField
                 control={form.control}
-                name="installationDate"
+                name="scheduleDate"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Installation Date</FormLabel>
+                    <FormLabel>Schedule Start Date</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -206,7 +250,7 @@ export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialo
                           mode="single"
                           selected={field.value}
                           onSelect={field.onChange}
-                          disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
+                          disabled={(date) => date < new Date()}
                           initialFocus
                         />
                       </PopoverContent>
@@ -216,29 +260,51 @@ export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialo
                 )}
               />
             </div>
-             <FormField
-                control={form.control}
-                name="imageId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Instrument Image</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an image type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {PlaceHolderImages.map(image => (
-                            <SelectItem key={image.id} value={image.id}>{image.description}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            <DialogFooter>
+            <div className="grid grid-cols-2 gap-4">
+                <FormField
+                    control={form.control}
+                    name="frequency"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Maintenance Frequency</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                            <SelectTrigger>
+                            <SelectValue placeholder="Select frequency" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {frequencies.map(freq => <SelectItem key={freq} value={freq}>{freq}</SelectItem>)}
+                        </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="imageId"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Instrument Image</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                            <SelectTrigger>
+                            <SelectValue placeholder="Select an image type" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {PlaceHolderImages.map(image => (
+                                <SelectItem key={image.id} value={image.id}>{image.description}</SelectItem>
+                            ))}
+                        </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+            </div>
+            <DialogFooter className="pt-4">
               <Button variant="ghost" onClick={() => onOpenChange(false)} type="button">
                 Cancel
               </Button>
@@ -253,3 +319,5 @@ export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialo
     </Dialog>
   );
 }
+
+    

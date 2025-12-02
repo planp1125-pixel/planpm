@@ -1,33 +1,33 @@
 import type { Timestamp } from 'firebase/firestore';
 
-export type InstrumentStatus = 'Operational' | 'Needs Maintenance' | 'Out of Service' | 'Archived';
+export type InstrumentStatus = 'AMC' | 'PM' | 'Operational' | 'Out of Service';
+export type MaintenanceFrequency = 'Weekly' | 'Monthly' | '3 Months' | '6 Months' | '1 Year';
+export type InstrumentType = "Lab Balance" | "Scale" | "pH Meter" | "Tap Density Tester" | "UV-Vis Spectrophotometer" | "GC" | "Spectrometer";
+export type MaintenanceTaskType = "Calibration" | "Preventative Maintenance" | "Validation";
 
 export type MaintenanceEvent = {
-  id: string;
-  date: string; // Keep as string for form, convert to Timestamp for Firestore
-  type: 'Scheduled' | 'Unscheduled' | 'Emergency';
+  id: string; // Document ID
+  instrumentId: string;
+  dueDate: Timestamp;
+  type: MaintenanceTaskType;
   description: string;
+  status: 'Scheduled' | 'In Progress' | 'Completed' | 'Overdue';
   notes?: string;
-  completed: boolean;
-  files?: string[];
 };
 
 // This represents the data structure in Firestore
 export type Instrument = {
   id: string; // Document ID
-  name: string;
+  eqpId: string;
+  instrumentType: InstrumentType;
   model: string;
   serialNumber: string;
   location: string;
   status: InstrumentStatus;
-  installationDate: Timestamp;
-  lastMaintenanceDate: Timestamp;
+  scheduleDate: Timestamp; // The start date of the first schedule
+  frequency: MaintenanceFrequency;
   nextMaintenanceDate: Timestamp;
   imageId: string;
-  // Subcollections would be handled separately
 };
 
-// This is used for creating a new instrument, dates are strings from the form
-export type NewInstrument = Omit<Instrument, 'id' | 'lastMaintenanceDate' | 'nextMaintenanceDate' | 'installationDate'> & {
-  installationDate: string;
-};
+    

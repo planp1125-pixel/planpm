@@ -21,9 +21,9 @@ import { Timestamp } from 'firebase/firestore';
 
 const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
   Operational: 'default',
-  'Needs Maintenance': 'secondary',
+  AMC: 'secondary',
+  PM: 'secondary',
   'Out of Service': 'destructive',
-  Archived: 'outline',
 };
 
 // Helper to format Timestamp to string
@@ -37,11 +37,11 @@ const formatDate = (timestamp: Timestamp) => {
 
 export const columns: ColumnDef<Instrument>[] = [
   {
-    accessorKey: 'name',
+    accessorKey: 'eqpId',
     header: ({ column }) => {
       return (
         <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-          Instrument
+          Eqp. ID
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       );
@@ -55,7 +55,7 @@ export const columns: ColumnDef<Instrument>[] = [
             {image ? (
               <Image
                 src={image.imageUrl}
-                alt={instrument.name}
+                alt={instrument.eqpId}
                 width={64}
                 height={48}
                 className="object-cover w-full h-full"
@@ -66,8 +66,8 @@ export const columns: ColumnDef<Instrument>[] = [
             )}
           </div>
           <div>
-            <div className="font-medium">{instrument.name}</div>
-            <div className="text-sm text-muted-foreground">{instrument.serialNumber}</div>
+            <div className="font-medium">{instrument.eqpId}</div>
+            <div className="text-sm text-muted-foreground">{instrument.instrumentType}</div>
           </div>
         </div>
       );
@@ -108,10 +108,10 @@ export const columns: ColumnDef<Instrument>[] = [
     },
   },
     {
-    accessorKey: 'installationDate',
-    header: 'Installed On',
+    accessorKey: 'scheduleDate',
+    header: 'Scheduled On',
     cell: ({ row }) => {
-      const date = row.getValue('installationDate') as Timestamp;
+      const date = row.getValue('scheduleDate') as Timestamp;
       return formatDate(date);
     }
   },
@@ -134,7 +134,9 @@ export const columns: ColumnDef<Instrument>[] = [
                 Copy Instrument ID
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>View Details</DropdownMenuItem>
+              <Link href={`/instruments/${instrument.id}`} passHref>
+                <DropdownMenuItem>View Details</DropdownMenuItem>
+              </Link>
               <DropdownMenuItem>Update Maintenance</DropdownMenuItem>
               <Link href={`/advisor?instrumentId=${instrument.id}`} passHref>
                 <DropdownMenuItem>Predict Failure</DropdownMenuItem>
@@ -146,3 +148,5 @@ export const columns: ColumnDef<Instrument>[] = [
     },
   },
 ];
+
+    

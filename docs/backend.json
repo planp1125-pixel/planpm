@@ -10,17 +10,18 @@
           "type": "string",
           "description": "Unique identifier for the Instrument entity."
         },
-        "name": {
+        "eqpId": {
           "type": "string",
-          "description": "Name of the instrument."
+          "description": "Equipment ID for the instrument."
+        },
+        "instrumentType": {
+          "type": "string",
+          "description": "Type of the instrument (e.g., lab balance, scale, phmeter).",
+          "enum": ["Lab Balance", "Scale", "pH Meter", "Tap Density Tester", "UV-Vis Spectrophotometer", "GC", "Spectrometer"]
         },
         "model": {
           "type": "string",
           "description": "Model of the instrument."
-        },
-        "manufacturer": {
-          "type": "string",
-          "description": "Manufacturer of the instrument."
         },
         "serialNumber": {
           "type": "string",
@@ -30,18 +31,34 @@
           "type": "string",
           "description": "Location of the instrument within the lab."
         },
-        "installationDate": {
+        "scheduleDate": {
           "type": "string",
-          "description": "Date when the instrument was installed.",
+          "description": "The start date for the maintenance schedule.",
           "format": "date-time"
+        },
+        "frequency": {
+          "type": "string",
+          "description": "Maintenance frequency for the instrument.",
+          "enum": ["Weekly", "Monthly", "3 Months", "6 Months", "1 Year"]
+        },
+        "status": {
+            "type": "string",
+            "description": "Maintenance status of the instrument.",
+            "enum": ["AMC", "PM", "Operational", "Out of Service"]
+        },
+        "imageId": {
+            "type": "string",
+            "description": "ID for the placeholder instrument image."
         }
       },
       "required": [
         "id",
-        "name",
+        "eqpId",
+        "instrumentType",
         "model",
-        "manufacturer",
-        "serialNumber"
+        "serialNumber",
+        "scheduleDate",
+        "frequency"
       ]
     },
     "MaintenanceSchedule": {
@@ -63,6 +80,11 @@
           "description": "Date when the maintenance is due.",
           "format": "date-time"
         },
+        "type": {
+            "type": "string",
+            "description": "Type of maintenance.",
+            "enum": ["Calibration", "Preventative Maintenance", "Validation"]
+        },
         "description": {
           "type": "string",
           "description": "Description of the maintenance task."
@@ -76,6 +98,7 @@
         "id",
         "instrumentId",
         "dueDate",
+        "type",
         "description",
         "status"
       ]
@@ -179,7 +202,7 @@
           "schema": {
             "$ref": "#/backend/entities/Instrument"
           },
-          "description": "Stores instrument details.  Each instrument has its own document.",
+          "description": "Stores instrument details. Each instrument has its own document.",
           "params": [
             {
               "name": "instrumentId",
@@ -265,6 +288,8 @@
         }
       }
     ],
-    "reasoning": "The Firestore data structure is designed to support the LabTrack application's core features, prioritizing authorization independence, clarity, and scalability. It uses a hierarchical path-based ownership for Instruments and their associated Maintenance Schedules and Records. This structure ensures that security rules can be written without relying on `get()` calls, thus enabling atomic operations and improving debuggability.  The design incorporates denormalization where necessary to maintain authorization independence. The file storage will use Firebase Storage, but the metadata is stored in firestore.  The structure uses homogeneous security postures by segregating data types into distinct collections, with each collection enforcing a consistent set of security rules. This segregation simplifies the security rules and reduces the risk of unintended access.  To support QAPs, the design leverages path-based ownership, allowing for efficient and secure listing of resources owned by a specific user/instrument. The Predictive Maintenance Advisor feature does not directly influence the database structure. The dashboard primarily uses the data present in these collections, so no special data structures are required. Role-based access control is implemented using a dedicated collection for admin roles, enabling secure management of application resources. No Custom Claims are used."
+    "reasoning": "The Firestore data structure is designed to support the LabTrack application's core features, prioritizing authorization independence, clarity, and scalability. It uses a hierarchical path-based ownership for Instruments and their associated Maintenance Schedules and Records. This structure ensures that security rules can be written without relying on `get()` calls, thus enabling atomic operations and improving debuggability. The design incorporates denormalization where necessary to maintain authorization independence. The file storage will use Firebase Storage, but the metadata is stored in firestore. The structure uses homogeneous security postures by segregating data types into distinct collections, with each collection enforcing a consistent set of security rules. To support QAPs, the design leverages path-based ownership, allowing for efficient and secure listing of resources owned by a specific user/instrument. The Predictive Maintenance Advisor feature does not directly influence the database structure. The dashboard primarily uses the data present in these collections, so no special data structures are required. Role-based access control is implemented using a dedicated collection for admin roles, enabling secure management of application resources. No Custom Claims are used."
   }
 }
+
+    
