@@ -25,18 +25,29 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Instrument } from '@/lib/types';
 import { columns as columnDefs } from './columns';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
+import { AddInstrumentDialog } from './add-instrument-dialog';
 
-interface DataTableProps<TData extends Instrument> {
-  data: TData[];
-}
-
-export function InstrumentClientPage<TData extends Instrument>({ data }: DataTableProps<TData>) {
+export function InstrumentClientPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const columns: ColumnDef<TData>[] = columnDefs;
+  const [isAddDialogOpen, setAddDialogOpen] = useState(false);
+
+  const firestore = useFirestore();
+
+  const instrumentsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'instruments');
+  }, [firestore]);
+
+  const { data: instruments, isLoading } = useCollection<Instrument>(instrumentsQuery);
+
+  const columns: ColumnDef<Instrument>[] = columnDefs;
 
   const table = useReactTable({
-    data,
+    data: instruments || [],
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -59,7 +70,7 @@ export function InstrumentClientPage<TData extends Instrument>({ data }: DataTab
           onChange={(event) => table.getColumn('name')?.setFilterValue(event.target.value)}
           className="max-w-sm"
         />
-        <Button>Add Instrument</Button>
+        <Button onClick={() => setAddDialogOpen(true)}>Add Instrument</Button>
       </div>
       <div className="rounded-md border">
         <Table>
@@ -79,7 +90,17 @@ export function InstrumentClientPage<TData extends Instrument>({ data }: DataTab
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  {columns.map((col, j) => (
+                    <TableCell key={j}>
+                      <Skeleton className="h-8 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
                   {row.getVisibleCells().map((cell) => (
@@ -117,6 +138,7 @@ export function InstrumentClientPage<TData extends Instrument>({ data }: DataTab
           Next
         </Button>
       </div>
+      <AddInstrumentDialog isOpen={isAddDialogOpen} onOpenChange={setAddDialogOpen} />
     </div>
   );
 }

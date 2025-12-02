@@ -13,10 +13,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, ArrowUpDown } from 'lucide-react';
-import { parseISO, isAfter } from 'date-fns';
+import { isAfter } from 'date-fns';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Image from 'next/image';
 import Link from 'next/link';
+import { Timestamp } from 'firebase/firestore';
 
 const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
   Operational: 'default',
@@ -24,6 +25,15 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 
   'Out of Service': 'destructive',
   Archived: 'outline',
 };
+
+// Helper to format Timestamp to string
+const formatDate = (timestamp: Timestamp) => {
+  if (!timestamp || typeof timestamp.toDate !== 'function') {
+    return 'N/A';
+  }
+  return timestamp.toDate().toLocaleDateString();
+};
+
 
 export const columns: ColumnDef<Instrument>[] = [
   {
@@ -42,7 +52,7 @@ export const columns: ColumnDef<Instrument>[] = [
       return (
         <div className="flex items-center gap-4">
           <div className="w-16 h-12 rounded-md overflow-hidden bg-muted">
-            {image && (
+            {image ? (
               <Image
                 src={image.imageUrl}
                 alt={instrument.name}
@@ -51,6 +61,8 @@ export const columns: ColumnDef<Instrument>[] = [
                 className="object-cover w-full h-full"
                 data-ai-hint={image.imageHint}
               />
+            ) : (
+               <div className="w-16 h-12 bg-muted flex items-center justify-center text-xs text-muted-foreground">No Image</div>
             )}
           </div>
           <div>
@@ -84,8 +96,9 @@ export const columns: ColumnDef<Instrument>[] = [
       );
     },
     cell: ({ row }) => {
-      const dateStr = row.getValue('nextMaintenanceDate') as string;
-      const isOverdue = isAfter(new Date(), parseISO(dateStr));
+      const date = row.getValue('nextMaintenanceDate') as Timestamp;
+      const dateStr = formatDate(date);
+      const isOverdue = date && isAfter(new Date(), date.toDate());
       return (
         <div className={`flex items-center ${isOverdue ? 'text-destructive' : ''}`}>
           {dateStr}
@@ -93,6 +106,14 @@ export const columns: ColumnDef<Instrument>[] = [
         </div>
       );
     },
+  },
+    {
+    accessorKey: 'installationDate',
+    header: 'Installed On',
+    cell: ({ row }) => {
+      const date = row.getValue('installationDate') as Timestamp;
+      return formatDate(date);
+    }
   },
   {
     id: 'actions',

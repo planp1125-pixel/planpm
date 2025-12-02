@@ -1,5 +1,4 @@
 import { InstrumentClientPage } from "@/components/instruments/instrument-client-page";
-import { mockInstruments } from "@/lib/data";
 
 export default function InstrumentsPage() {
   return (
@@ -8,7 +7,7 @@ export default function InstrumentsPage() {
       <p className="text-muted-foreground">
         Manage your lab's instruments and track their maintenance schedules.
       </p>
-      <InstrumentClientPage data={mockInstruments} />
+      <InstrumentClientPage />
     </div>
   );
 }

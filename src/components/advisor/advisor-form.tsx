@@ -1,11 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { predictInstrumentFailure } from '@/app/actions';
-import { mockInstruments } from '@/lib/data';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +13,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Bot, Lightbulb, Loader2 } from 'lucide-react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, where, getDocs, collectionGroup } from 'firebase/firestore';
+import type { Instrument, MaintenanceEvent } from '@/lib/types';
+import { Skeleton } from '../ui/skeleton';
 
 const formSchema = z.object({
   instrumentId: z.string().min(1, 'Please select an instrument.'),
@@ -32,29 +35,66 @@ export function AdvisorForm({ instrumentId: initialInstrumentId }: { instrumentI
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const firestore = useFirestore();
+  const instrumentsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'instruments') : null, [firestore]);
+  const { data: instruments, isLoading: isLoadingInstruments } = useCollection<Omit<Instrument, 'id'>>(instrumentsQuery);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       instrumentId: initialInstrumentId || '',
-      usagePatterns: mockInstruments.find(i => i.id === initialInstrumentId)?.usagePatterns || '',
+      usagePatterns: '',
     },
   });
+
+  useEffect(() => {
+    if (initialInstrumentId && instruments) {
+        const instrument = instruments.find(i => i.id === initialInstrumentId);
+        // We don't have usage patterns in the main instrument doc anymore.
+        // Let's leave it blank for the user to fill in.
+    }
+  }, [initialInstrumentId, instruments]);
 
   const onSubmit = async (values: FormValues) => {
     setIsLoading(true);
     setPrediction(null);
     setError(null);
+
+    if (!firestore) {
+        setError('Database connection not available.');
+        setIsLoading(false);
+        return;
+    }
     
-    const instrument = mockInstruments.find(i => i.id === values.instrumentId);
+    const instrument = instruments?.find(i => i.id === values.instrumentId);
     if (!instrument) {
       setError('Selected instrument not found.');
       setIsLoading(false);
       return;
     }
+    
+    // Fetch maintenance history
+    let maintenanceHistory = '';
+    try {
+        const historyQuery = query(
+            collectionGroup(firestore, 'maintenanceSchedules'), 
+            where('instrumentId', '==', values.instrumentId)
+        );
+        const historySnapshot = await getDocs(historyQuery);
+        const historyRecords: MaintenanceEvent[] = [];
+        historySnapshot.forEach(doc => {
+            historyRecords.push({ id: doc.id, ...doc.data() } as MaintenanceEvent);
+        });
+        
+        maintenanceHistory = historyRecords
+            .map(h => `${h.date} - ${h.type}: ${h.description} (${h.completed ? 'Completed' : 'Pending'}). Notes: ${h.notes || 'N/A'}`)
+            .join('\n');
+    } catch(e) {
+        console.error("Could not fetch maintenance history: ", e);
+        setError("Could not fetch maintenance history for analysis.");
+        // We can still proceed without it
+    }
 
-    const maintenanceHistory = instrument.maintenanceHistory
-      .map(h => `${h.date} - ${h.type}: ${h.description} (${h.completed ? 'Completed' : 'Pending'}). Notes: ${h.notes || 'N/A'}`)
-      .join('\n');
 
     try {
       const result = await predictInstrumentFailure({
@@ -75,6 +115,7 @@ export function AdvisorForm({ instrumentId: initialInstrumentId }: { instrumentI
   return (
     <div className="grid md:grid-cols-2 gap-8">
       <Card>
+        {isLoadingInstruments ? <Skeleton className="h-full w-full" /> : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardHeader>
@@ -90,8 +131,8 @@ export function AdvisorForm({ instrumentId: initialInstrumentId }: { instrumentI
                     <FormLabel>Instrument</FormLabel>
                     <Select onValueChange={(value) => {
                       field.onChange(value);
-                      const instrumentUsage = mockInstruments.find(i => i.id === value)?.usagePatterns || '';
-                      form.setValue('usagePatterns', instrumentUsage);
+                      // Reset usage patterns on change
+                      form.setValue('usagePatterns', '');
                     }} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -99,7 +140,7 @@ export function AdvisorForm({ instrumentId: initialInstrumentId }: { instrumentI
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {mockInstruments.map((instrument) => (
+                        {instruments?.map((instrument) => (
                           <SelectItem key={instrument.id} value={instrument.id}>
                             {instrument.name} ({instrument.serialNumber})
                           </SelectItem>
@@ -136,6 +177,7 @@ export function AdvisorForm({ instrumentId: initialInstrumentId }: { instrumentI
             </CardFooter>
           </form>
         </Form>
+        )}
       </Card>
 
       <Card className="flex flex-col">

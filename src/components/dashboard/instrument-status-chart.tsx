@@ -2,8 +2,12 @@
 
 import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { mockInstruments } from '@/lib/data';
 import { useMemo, useState, useEffect } from 'react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import type { Instrument } from '@/lib/types';
+import { Skeleton } from '../ui/skeleton';
+
 
 const COLORS = {
   'Operational': 'hsl(var(--chart-1))',
@@ -13,14 +17,23 @@ const COLORS = {
 };
 
 const Chart = () => {
+  const firestore = useFirestore();
+  const query = useMemoFirebase(() => firestore ? collection(firestore, 'instruments') : null, [firestore]);
+  const { data: instruments, isLoading } = useCollection<Instrument>(query);
+
   const data = useMemo(() => {
-    const statusCounts = mockInstruments.reduce((acc, instrument) => {
+    if (!instruments) return [];
+    const statusCounts = instruments.reduce((acc, instrument) => {
       acc[instrument.status] = (acc[instrument.status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
     return Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
-  }, []);
+  }, [instruments]);
+
+  if (isLoading) {
+    return <Skeleton className="w-full h-[300px] rounded-full" />;
+  }
 
   return (
     <div className="w-full h-[300px]">
@@ -45,8 +58,8 @@ const Chart = () => {
             );
           }}
         >
-          {data.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[entry.name as keyof typeof COLORS]} />
+          {data.map((entry) => (
+            <Cell key={`cell-${entry.name}`} fill={COLORS[entry.name as keyof typeof COLORS]} />
           ))}
         </Pie>
         <Tooltip
@@ -76,7 +89,7 @@ export function InstrumentStatusChart() {
         <CardDescription>Distribution of instrument operational status.</CardDescription>
       </CardHeader>
       <CardContent>
-        {isClient ? <Chart /> : <div className="w-full h-[300px]" />}
+        {isClient ? <Chart /> : <Skeleton className="w-full h-[300px] rounded-full" />}
       </CardContent>
     </Card>
   );

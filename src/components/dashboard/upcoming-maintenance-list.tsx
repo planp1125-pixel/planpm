@@ -1,16 +1,31 @@
-import { mockInstruments } from '@/lib/data';
+'use client';
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { differenceInDays, parseISO, isBefore, addDays } from 'date-fns';
+import { differenceInDays, isBefore, addDays } from 'date-fns';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, Timestamp, query, where, orderBy } from 'firebase/firestore';
+import type { Instrument } from '@/lib/types';
+import { Skeleton } from '../ui/skeleton';
 
 export function UpcomingMaintenanceList() {
-  const upcoming = mockInstruments
-    .filter(inst => {
-      const nextDate = parseISO(inst.nextMaintenanceDate);
-      return isBefore(nextDate, addDays(new Date(), 30)) && isBefore(new Date(), nextDate);
-    })
-    .sort((a, b) => new Date(a.nextMaintenanceDate).getTime() - new Date(b.nextMaintenanceDate).getTime());
+  const firestore = useFirestore();
+
+  const upcomingQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    const now = Timestamp.now();
+    const thirtyDaysFromNow = Timestamp.fromMillis(now.toMillis() + 30 * 24 * 60 * 60 * 1000);
+    
+    return query(
+      collection(firestore, 'instruments'),
+      where('nextMaintenanceDate', '>=', now),
+      where('nextMaintenanceDate', '<=', thirtyDaysFromNow),
+      orderBy('nextMaintenanceDate', 'asc')
+    );
+  }, [firestore]);
+
+  const { data: upcoming, isLoading } = useCollection<Instrument>(upcomingQuery);
 
   return (
     <Card className="transition-all hover:shadow-md">
@@ -29,9 +44,20 @@ export function UpcomingMaintenanceList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {upcoming.length > 0 ? (
+            {isLoading ? (
+               Array.from({ length: 3 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-6 w-32"/></TableCell>
+                  <TableCell><Skeleton className="h-6 w-24"/></TableCell>
+                  <TableCell><Skeleton className="h-6 w-24"/></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-6 w-16 ml-auto"/></TableCell>
+                </TableRow>
+              ))
+            ) : upcoming && upcoming.length > 0 ? (
               upcoming.map(inst => {
-                const daysLeft = differenceInDays(parseISO(inst.nextMaintenanceDate), new Date());
+                if (!inst.nextMaintenanceDate) return null;
+                const dueDate = inst.nextMaintenanceDate.toDate();
+                const daysLeft = differenceInDays(dueDate, new Date());
                 return (
                   <TableRow key={inst.id}>
                     <TableCell>
@@ -39,7 +65,7 @@ export function UpcomingMaintenanceList() {
                       <div className="text-sm text-muted-foreground">{inst.serialNumber}</div>
                     </TableCell>
                     <TableCell>{inst.location}</TableCell>
-                    <TableCell>{inst.nextMaintenanceDate}</TableCell>
+                    <TableCell>{dueDate.toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">
                       <Badge variant={daysLeft <= 7 ? 'destructive' : 'secondary'}>{daysLeft} days</Badge>
                     </TableCell>
