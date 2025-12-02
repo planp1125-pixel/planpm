@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -21,11 +21,11 @@ import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, addWeeks, addMonths, addYears } from 'date-fns';
-import { useFirestore, addDocumentNonBlocking } from '@/firebase';
-import { collection, Timestamp } from 'firebase/firestore';
+import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
+import { collection, Timestamp, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import type { InstrumentStatus, MaintenanceFrequency, InstrumentType } from '@/lib/types';
+import type { Instrument, InstrumentStatus, MaintenanceFrequency, InstrumentType } from '@/lib/types';
 import { Combobox } from '@/components/ui/combobox';
 import { useInstrumentTypes } from '@/hooks/use-instrument-types';
 
@@ -46,11 +46,12 @@ const formSchema = z.object({
   imageId: z.string().min(1, "Please select an image"),
 });
 
-type AddInstrumentFormValues = z.infer<typeof formSchema>;
+type EditInstrumentFormValues = z.infer<typeof formSchema>;
 
-interface AddInstrumentDialogProps {
+interface EditInstrumentDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  instrument: Instrument;
 }
 
 const getNextMaintenanceDate = (startDate: Date, frequency: MaintenanceFrequency): Date => {
@@ -70,33 +71,41 @@ const getNextMaintenanceDate = (startDate: Date, frequency: MaintenanceFrequency
     }
 };
 
-export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialogProps) {
+export function EditInstrumentDialog({ isOpen, onOpenChange, instrument }: EditInstrumentDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
   const { instrumentTypes, addInstrumentType, isLoading: isLoadingTypes } = useInstrumentTypes();
 
-  const form = useForm<AddInstrumentFormValues>({
+  const form = useForm<EditInstrumentFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      eqpId: '',
-      instrumentType: '',
-      model: '',
-      serialNumber: '',
-      location: '',
-      status: 'Operational',
-      frequency: '',
-      imageId: '',
+      eqpId: instrument.eqpId,
+      instrumentType: instrument.instrumentType,
+      model: instrument.model,
+      serialNumber: instrument.serialNumber,
+      location: instrument.location,
+      status: instrument.status,
+      scheduleDate: instrument.scheduleDate.toDate(),
+      frequency: instrument.frequency,
+      imageId: instrument.imageId,
     },
   });
+  
+  useEffect(() => {
+    form.reset({
+      ...instrument,
+      scheduleDate: instrument.scheduleDate.toDate(),
+    });
+  }, [instrument, form]);
 
-  const onSubmit = (values: AddInstrumentFormValues) => {
+  const onSubmit = (values: EditInstrumentFormValues) => {
     if (!firestore) return;
     setIsLoading(true);
 
     const nextMaintenanceDate = getNextMaintenanceDate(values.scheduleDate, values.frequency as MaintenanceFrequency);
 
-    const newInstrumentData = {
+    const updatedInstrumentData = {
       ...values,
       status: values.status as InstrumentStatus,
       instrumentType: values.instrumentType as InstrumentType,
@@ -104,36 +113,30 @@ export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialo
       scheduleDate: Timestamp.fromDate(values.scheduleDate),
       nextMaintenanceDate: Timestamp.fromDate(nextMaintenanceDate),
     };
-
+    
     // Add new instrument type to the list if it's not already there
     if (!instrumentTypes.find(t => t.value === values.instrumentType)) {
       addInstrumentType(values.instrumentType);
     }
 
-    const instrumentsColRef = collection(firestore, 'instruments');
-    addDocumentNonBlocking(instrumentsColRef, newInstrumentData)
-      .then(() => {
-        toast({
-          title: 'Instrument Added',
-          description: `${values.eqpId} has been added to the inventory.`,
-        });
-        form.reset();
-        onOpenChange(false);
-      })
-      .catch((err) => {
-        console.error(err);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
+    const instrumentDocRef = doc(firestore, 'instruments', instrument.id);
+    updateDocumentNonBlocking(instrumentDocRef, updatedInstrumentData);
+
+    toast({
+      title: 'Instrument Updated',
+      description: `${values.eqpId} has been updated.`,
+    });
+
+    setIsLoading(false);
+    onOpenChange(false);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Add New Instrument</DialogTitle>
-          <DialogDescription>Fill in the details below to add a new instrument to the inventory.</DialogDescription>
+          <DialogTitle>Edit Instrument</DialogTitle>
+          <DialogDescription>Update the details for this instrument.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
@@ -155,16 +158,16 @@ export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialo
                     control={form.control}
                     name="instrumentType"
                     render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                        <FormLabel>Instrument Type</FormLabel>
-                        <Combobox 
-                            options={instrumentTypes}
-                            value={field.value}
-                            onChange={field.onChange}
-                            placeholder="Select or type..."
-                            loading={isLoadingTypes}
-                        />
-                        <FormMessage />
+                         <FormItem className="flex flex-col">
+                            <FormLabel>Instrument Type</FormLabel>
+                            <Combobox 
+                                options={instrumentTypes}
+                                value={field.value}
+                                onChange={field.onChange}
+                                placeholder="Select or type..."
+                                loading={isLoadingTypes}
+                            />
+                            <FormMessage />
                         </FormItem>
                     )}
                 />
@@ -314,7 +317,7 @@ export function AddInstrumentDialog({ isOpen, onOpenChange }: AddInstrumentDialo
               </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Add Instrument
+                Save Changes
               </Button>
             </DialogFooter>
           </form>

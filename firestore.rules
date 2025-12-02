@@ -61,12 +61,22 @@ service cloud.firestore {
      * @principle   Restricts sensitive role management to the backend, preventing privilege escalation.
      */
     match /roles_admin/{userId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow read, write: if false;
     }
+
+    // -------------------------------------------------------------------------
+    // Instrument Types
+    // -------------------------------------------------------------------------
+    /**
+     * @description Stores the list of available instrument types.
+     *              Readable by any authenticated user, writable by any authenticated user
+     *              to allow adding new types.
+     * @path        /instrumentTypes/{instrumentTypeId}
+     */
+    match /instrumentTypes/{instrumentTypeId} {
+      allow read, write: if isSignedIn();
+    }
+
 
     // -------------------------------------------------------------------------
     // Instruments & Maintenance Data
@@ -81,11 +91,7 @@ service cloud.firestore {
      * @principle   Enforces admin-only control over core data entities.
      */
     match /instruments/{instrumentId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow read, write: if isSignedIn();
 
       /**
        * @description Stores maintenance schedules for an instrument. Writable only by admins.

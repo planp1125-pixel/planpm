@@ -35,7 +35,7 @@ const formatDate = (timestamp: Timestamp | undefined) => {
 };
 
 
-export const columns: ColumnDef<Instrument>[] = [
+export const columns = (onEdit: (instrument: Instrument) => void): ColumnDef<Instrument>[] => [
   {
     accessorKey: 'eqpId',
     header: ({ column }) => {
@@ -130,8 +130,8 @@ export const columns: ColumnDef<Instrument>[] = [
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(instrument.id)}>
-                Copy Instrument ID
+              <DropdownMenuItem onClick={() => onEdit(instrument)}>
+                Edit Instrument
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <Link href={`/instruments/${instrument.id}`} passHref>

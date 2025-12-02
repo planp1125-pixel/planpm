@@ -24,16 +24,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Instrument } from '@/lib/types';
-import { columns as columnDefs } from './columns';
+import { columns as createColumns } from './columns';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AddInstrumentDialog } from './add-instrument-dialog';
+import { EditInstrumentDialog } from './edit-instrument-dialog';
 
 export function InstrumentClientPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
+  const [editingInstrument, setEditingInstrument] = useState<Instrument | null>(null);
 
   const firestore = useFirestore();
 
@@ -43,8 +45,12 @@ export function InstrumentClientPage() {
   }, [firestore]);
 
   const { data: instruments, isLoading } = useCollection<Instrument>(instrumentsQuery);
-
-  const columns: ColumnDef<Instrument>[] = columnDefs;
+  
+  const handleEdit = (instrument: Instrument) => {
+    setEditingInstrument(instrument);
+  };
+  
+  const columns = createColumns(handleEdit);
 
   const table = useReactTable({
     data: instruments || [],
@@ -139,8 +145,17 @@ export function InstrumentClientPage() {
         </Button>
       </div>
       <AddInstrumentDialog isOpen={isAddDialogOpen} onOpenChange={setAddDialogOpen} />
+      {editingInstrument && (
+        <EditInstrumentDialog 
+          isOpen={!!editingInstrument} 
+          onOpenChange={(isOpen) => {
+            if (!isOpen) {
+              setEditingInstrument(null);
+            }
+          }} 
+          instrument={editingInstrument}
+        />
+      )}
     </div>
   );
 }
-
-    
