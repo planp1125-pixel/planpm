@@ -64,7 +64,7 @@ Use this quick checklist to deploy PlanPM to production.
 - [ ] Wait for build (2-3 minutes)
 - [ ] Copy your Vercel URL (e.g., `https://planpm.vercel.app`)
 
----
+---  
 
 ## Post-Deployment Configuration
 
