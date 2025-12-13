@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bot, LayoutDashboard, Wrench, ClipboardList, Settings, PanelLeft, FileText, FlaskConical } from 'lucide-react';
+import { Bot, LayoutDashboard, Wrench, ClipboardList, Settings, PanelLeft, FileText } from 'lucide-react';
+import Image from 'next/image';
+import planpmLogo from '../../../icons/planpm.png';
 import {
   Sidebar,
   SidebarHeader,
@@ -37,7 +39,13 @@ export function AppSidebar() {
           </Button>
           {open && (
             <Link href="/" className="flex items-center gap-2 text-lg font-bold font-headline tracking-tight whitespace-nowrap">
-              <FlaskConical className="h-5 w-5 text-primary" />
+              <Image
+                src={planpmLogo}
+                alt="Plan PM logo"
+                width={90}
+                height={90}
+                className="object-contain"
+              />
               <span>Plan-PM</span>
             </Link>
           )}

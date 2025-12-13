@@ -5,16 +5,21 @@ import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FileText, Search, CheckCircle, XCircle, ChevronDown, ChevronUp, Calendar, Beaker } from 'lucide-react';
+import { FileText, Search, CheckCircle, XCircle, ChevronDown, ChevronUp, Calendar, Beaker, Download, MapPin, Phone } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import type { MaintenanceResult, Instrument, TestSection } from '@/lib/types';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import { formatDate, formatDateTime } from '@/lib/date-utils';
 
 type ExtendedResult = MaintenanceResult & {
     instrument?: Instrument;
     scheduleDescription?: string;
+    scheduleType?: string;
+    maintenanceBy?: string | null;
+    vendorName?: string | null;
+    vendorContact?: string | null;
     testData?: TestSection[];
     templateId?: string;
 };
@@ -23,7 +28,7 @@ export default function ResultsPage() {
     const [results, setResults] = useState<ExtendedResult[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [openIds, setOpenIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         const fetchResults = async () => {
@@ -56,14 +61,18 @@ export default function ResultsPage() {
             const scheduleIds = Array.from(new Set(resultsData.map(r => r.maintenanceScheduleId)));
             const { data: schedulesData } = await supabase
                 .from('maintenanceSchedules')
-                .select('id, description, type')
+                .select('id, description, type, maintenanceBy, vendorName, vendorContact')
                 .in('id', scheduleIds);
 
             // Merge
             const merged = resultsData.map(result => ({
                 ...result,
                 instrument: instrumentsData?.find(i => i.id === result.instrumentId),
-                scheduleDescription: schedulesData?.find(s => s.id === result.maintenanceScheduleId)?.description
+                scheduleDescription: schedulesData?.find(s => s.id === result.maintenanceScheduleId)?.description,
+                scheduleType: schedulesData?.find(s => s.id === result.maintenanceScheduleId)?.type,
+                maintenanceBy: schedulesData?.find(s => s.id === result.maintenanceScheduleId)?.maintenanceBy,
+                vendorName: schedulesData?.find(s => s.id === result.maintenanceScheduleId)?.vendorName,
+                vendorContact: schedulesData?.find(s => s.id === result.maintenanceScheduleId)?.vendorContact,
             }));
 
             setResults(merged);
@@ -79,6 +88,15 @@ export default function ResultsPage() {
         result.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         result.instrument?.instrumentType.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const toggleOpen = (id: string) => {
+        setOpenIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
 
     const getOverallStatus = (testData: TestSection[] | undefined) => {
         if (!testData || testData.length === 0) return null;
@@ -113,6 +131,86 @@ export default function ResultsPage() {
             default:
                 return <Badge variant="secondary">{type}</Badge>;
         }
+    };
+
+    const renderSectionRows = (section: TestSection) => {
+        if (!section.rows) return '';
+        const header = `
+          <tr>
+            <th style="text-align:left;padding:6px;">Label</th>
+            ${section.type === 'tolerance' ? '<th style="text-align:left;padding:6px;">Reference</th>' : ''}
+            ${section.type === 'range' ? '<th style="text-align:left;padding:6px;">Min</th><th style="text-align:left;padding:6px;">Max</th>' : ''}
+            <th style="text-align:left;padding:6px;">Measured</th>
+            ${section.type === 'tolerance' ? '<th style="text-align:left;padding:6px;">Error</th>' : ''}
+            <th style="text-align:left;padding:6px;">Status</th>
+          </tr>
+        `;
+        const rows = section.rows.map(row => {
+            const measured = row.measured !== undefined ? row.measured : '-';
+            const status = row.passed === undefined ? '-' : row.passed ? 'Pass' : 'Fail';
+            const error = row.error !== undefined ? `${row.error >= 0 ? '+' : ''}${row.error.toFixed(3)}` : '-';
+            const ref = row.reference !== undefined ? `${row.reference} ${row.unit || section.unit || ''}` : '';
+            return `
+              <tr>
+                <td style="padding:6px;">${row.label}</td>
+                ${section.type === 'tolerance' ? `<td style="padding:6px;">${ref}</td>` : ''}
+                ${section.type === 'range' ? `<td style="padding:6px;">${row.min ?? '-'}</td><td style="padding:6px;">${row.max ?? '-'}</td>` : ''}
+                <td style="padding:6px;">${measured}</td>
+                ${section.type === 'tolerance' ? `<td style="padding:6px;">${error}</td>` : ''}
+                <td style="padding:6px;">${status}</td>
+              </tr>
+            `;
+        }).join('');
+        return `<table style="width:100%;border-collapse:collapse;border:1px solid #eee;margin-top:6px;">${header}${rows}</table>`;
+    };
+
+    const buildResultPdf = (r: ExtendedResult) => {
+        const inst = r.instrument;
+        const maintBy = r.maintenanceBy === 'vendor' ? 'Vendor' : 'Self';
+        const vendor = r.maintenanceBy === 'vendor' ? `<div>Vendor: ${r.vendorName || 'N/A'} ${r.vendorContact ? `(${r.vendorContact})` : ''}</div>` : '';
+        const sections = (r.testData || []).map(section => `
+          <div style="margin-top:10px;padding:10px;border:1px solid #ddd;border-radius:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div><strong>${section.title}</strong></div>
+              ${section.type === 'tolerance' ? `<div style="font-size:12px;">±${section.tolerance} ${section.unit || ''}</div>` : ''}
+            </div>
+            ${section.type === 'checklist'
+              ? `<ul style="margin:8px 0;padding-left:16px;">${section.rows?.map(row => `<li>${row.label} — ${row.passed ? 'Done' : 'Pending'}</li>`).join('') || ''}</ul>`
+              : renderSectionRows(section)}
+          </div>
+        `).join('');
+
+        const html = `
+          <html>
+            <head>
+              <title>${inst?.eqpId || 'Maintenance Result'}</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 24px; }
+                h1 { margin: 0 0 8px; }
+                .badge { display:inline-block; padding:4px 8px; border-radius:12px; background:#eef; margin-right:6px; font-size:12px; }
+                .block { margin:4px 0; }
+              </style>
+            </head>
+            <body>
+              <h1>${inst?.eqpId || 'Instrument'} • ${r.scheduleType || r.resultType}</h1>
+              <div class="block">${inst?.instrumentType || ''} • ${inst?.model || ''}</div>
+              <div class="block">Maintenance By: ${maintBy}</div>
+              ${vendor}
+              ${inst?.location ? `<div class="block">Location: ${inst.location}</div>` : ''}
+              <div class="block">Completed: ${formatDateTime(r.completedDate)}</div>
+              ${r.scheduleDescription ? `<div class="block">Description: ${r.scheduleDescription}</div>` : ''}
+              ${r.notes ? `<div class="block">Notes: ${r.notes}</div>` : ''}
+              ${sections}
+            </body>
+          </html>
+        `;
+
+        const win = window.open('', '_blank');
+        if (!win) return;
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        win.print();
     };
 
     return (
@@ -150,32 +248,50 @@ export default function ResultsPage() {
                 <div className="space-y-4 w-full">
                     {filteredResults.map((result) => {
                         const overallStatus = getOverallStatus(result.testData);
-                        const isExpanded = expandedId === result.id;
+                        const isExpanded = openIds.has(result.id);
 
                         return (
                             <Card key={result.id} className="w-full overflow-hidden hover:shadow-md transition-shadow">
-                                <Collapsible open={isExpanded} onOpenChange={() => setExpandedId(isExpanded ? null : result.id)}>
+                                <Collapsible open={isExpanded} onOpenChange={() => toggleOpen(result.id)}>
                                     <CollapsibleTrigger asChild>
                                         <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-5 px-6">
-                                            <div className="flex items-center justify-between gap-6">
-                                                <div className="flex items-center gap-6">
-                                                    {/* Instrument Info */}
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center">
-                                                            <Beaker className="w-7 h-7 text-primary" />
-                                                        </div>
-                                                        <div>
-                                                            <div className="font-semibold text-lg">{result.instrument?.eqpId || 'Unknown'}</div>
-                                                            <div className="text-sm text-muted-foreground">{result.instrument?.instrumentType} • {result.instrument?.model}</div>
+                                            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center">
+                                                        <Beaker className="w-7 h-7 text-primary" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-semibold text-lg">{result.instrument?.eqpId || 'Unknown'}</div>
+                                                        <div className="text-sm text-muted-foreground">
+                                                            {result.instrument?.instrumentType} • {result.instrument?.model}
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-6">
-                                                    {/* Result Type */}
+                                                <div className="flex flex-wrap items-center gap-4 text-sm">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-muted-foreground">Type:</span>
+                                                        <Badge variant="outline">{result.scheduleType || result.resultType}</Badge>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-muted-foreground">Maintenance By:</span>
+                                                        <Badge variant="secondary">
+                                                            {result.maintenanceBy === 'vendor' ? 'Vendor' : 'Self'}
+                                                        </Badge>
+                                                        {result.maintenanceBy === 'vendor' && (
+                                                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                <Phone className="h-3 w-3" />
+                                                                <span>{result.vendorName || 'N/A'} {result.vendorContact ? `(${result.vendorContact})` : ''}</span>
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {result.instrument?.location && (
+                                                        <div className="flex items-center gap-1 text-muted-foreground">
+                                                            <MapPin className="w-4 h-4" />
+                                                            <span>{result.instrument.location}</span>
+                                                        </div>
+                                                    )}
                                                     {getResultTypeBadge(result.resultType)}
-
-                                                    {/* Overall Status */}
                                                     {overallStatus && (
                                                         <Badge className={cn(
                                                             overallStatus.status === 'pass'
@@ -189,17 +305,13 @@ export default function ResultsPage() {
                                                             )}
                                                         </Badge>
                                                     )}
-
-                                                    {/* Date & Time */}
                                                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                                         <Calendar className="w-4 h-4" />
                                                         <div className="flex flex-col">
-                                                            <span>{new Date(result.completedDate).toLocaleDateString()}</span>
+                                                            <span>{formatDate(result.completedDate)}</span>
                                                             <span className="text-xs">{new Date(result.completedDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                         </div>
                                                     </div>
-
-                                                    {/* Document */}
                                                     {result.documentUrl && (
                                                         <a
                                                             href={result.documentUrl}
@@ -211,8 +323,16 @@ export default function ResultsPage() {
                                                             <FileText className="w-4 h-4" />
                                                         </a>
                                                     )}
-
-                                                    {/* Expand */}
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            buildResultPdf(result);
+                                                        }}
+                                                    >
+                                                        <Download className="h-4 w-4 mr-1" /> PDF
+                                                    </Button>
                                                     {result.testData && result.testData.length > 0 && (
                                                         <div className="text-muted-foreground">
                                                             {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}

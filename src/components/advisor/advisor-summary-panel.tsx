@@ -27,6 +27,7 @@ export function AdvisorSummaryPanel() {
   const [instruments, setInstruments] = useState<Record<string, Instrument>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [instrumentFilter, setInstrumentFilter] = useState<string>('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -59,13 +60,17 @@ export function AdvisorSummaryPanel() {
     const rangeEnd = addDays(now, timeRange);
     const rangeStart = addDays(now, -timeRange);
 
-    const overdue = schedules.filter(s => new Date(s.dueDate) < now && s.status !== 'Completed');
-    const upcoming = schedules.filter(s => {
+    const filtered = instrumentFilter
+      ? schedules.filter(s => s.instrumentId === instrumentFilter)
+      : schedules;
+
+    const overdue = filtered.filter(s => new Date(s.dueDate) < now && s.status !== 'Completed');
+    const upcoming = filtered.filter(s => {
       const due = new Date(s.dueDate);
       return due >= now && due <= rangeEnd;
     });
-    const partial = schedules.filter(s => s.status === 'In Progress');
-    const completed = schedules.filter(s => {
+    const partial = filtered.filter(s => s.status === 'In Progress');
+    const completed = filtered.filter(s => {
       if (s.status !== 'Completed' || !s.completedDate) return false;
       const completedDate = new Date(s.completedDate);
       return completedDate >= rangeStart && completedDate <= now;
@@ -76,7 +81,7 @@ export function AdvisorSummaryPanel() {
 
   const handleExport = () => {
     const now = new Date();
-    const heading = `Maintenance Summary (Last/Next ${timeRange} Days)`;
+    const heading = `Maintenance Summary (Last/Next ${timeRange} Days${instrumentFilter ? ` • ${instruments[instrumentFilter]?.eqpId || ''}` : ''})`;
 
     const toLines = (title: string, items: MaintenanceEvent[]) => {
       if (!items.length) return `<h3>${title}</h3><p>None</p>`;
@@ -169,15 +174,27 @@ export function AdvisorSummaryPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant={timeRange === 30 ? 'default' : 'outline'} onClick={() => setTimeRange(30)}>30 days</Button>
-          <Button size="sm" variant={timeRange === 90 ? 'default' : 'outline'} onClick={() => setTimeRange(90)}>90 days</Button>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant={timeRange === 30 ? 'default' : 'outline'} onClick={() => setTimeRange(30)}>30 days</Button>
+            <Button size="sm" variant={timeRange === 90 ? 'default' : 'outline'} onClick={() => setTimeRange(90)}>90 days</Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={instrumentFilter}
+              onChange={(e) => setInstrumentFilter(e.target.value)}
+              className="h-9 rounded-md border bg-background px-2 text-sm"
+            >
+              <option value="">All instruments</option>
+              {Object.values(instruments).map(inst => (
+                <option key={inst.id} value={inst.id}>{inst.eqpId} ({inst.instrumentType})</option>
+              ))}
+            </select>
+            <Button size="sm" variant="secondary" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-1" /> Export PDF
+            </Button>
+          </div>
         </div>
-        <Button size="sm" variant="secondary" onClick={handleExport}>
-          <Download className="h-4 w-4 mr-1" /> Export PDF
-        </Button>
-      </div>
 
       <Card>
         <CardHeader className="pb-3">

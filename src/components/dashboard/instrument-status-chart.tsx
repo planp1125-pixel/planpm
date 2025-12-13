@@ -8,21 +8,33 @@ import type { Instrument } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 
 
-const COLORS = {
-  'PM': 'hsl(var(--chart-1))',
-  'AMC': 'hsl(var(--chart-2))',
-  'Calibration': 'hsl(var(--chart-3))',
-  'Validation': 'hsl(var(--chart-4))',
+const COLORS: Record<string, string> = {
+  'Preventative Maintenance': 'hsl(215 65% 48%)',
+  'PM': 'hsl(215 65% 48%)',
+  'AMC': 'hsl(28 65% 50%)',
+  'Calibration': 'hsl(155 50% 45%)',
+  'Validation': 'hsl(265 55% 52%)',
+  'Daily': 'hsl(195 55% 50%)',
+  'Weekly': 'hsl(335 55% 52%)',
+  'Monthly': 'hsl(40 60% 48%)',
+  '3 Months': 'hsl(255 50% 48%)',
+  '6 Months': 'hsl(10 55% 50%)',
+  '1 Year': 'hsl(135 50% 42%)',
 };
 
 const Chart = () => {
   const [instruments, setInstruments] = useState<Instrument[]>([]);
+  const [configs, setConfigs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchInstruments = async () => {
-      const { data, error } = await supabase.from('instruments').select('*');
-      if (data) setInstruments(data);
+      const [{ data: instrumentsData }, { data: configsData }] = await Promise.all([
+        supabase.from('instruments').select('*'),
+        supabase.from('maintenance_configurations').select('maintenance_type'),
+      ]);
+      if (instrumentsData) setInstruments(instrumentsData);
+      if (configsData) setConfigs(configsData);
       setIsLoading(false);
     };
 
@@ -30,6 +42,16 @@ const Chart = () => {
   }, []);
 
   const data = useMemo(() => {
+    // Prefer schedule configurations for distribution; fallback to instrument maintenanceType
+    if (configs && configs.length > 0) {
+      const typeCounts = configs.reduce((acc, c) => {
+        const type = (c as any).maintenance_type || 'Unknown';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      return Object.entries(typeCounts).map(([name, value]) => ({ name, value }));
+    }
+
     if (!instruments) return [];
     const typeCounts = instruments.reduce((acc, instrument) => {
       const type = instrument.maintenanceType || 'Unknown';
@@ -38,7 +60,7 @@ const Chart = () => {
     }, {} as Record<string, number>);
 
     return Object.entries(typeCounts).map(([name, value]) => ({ name, value }));
-  }, [instruments]);
+  }, [instruments, configs]);
 
   if (isLoading) {
     return <Skeleton className="w-full h-[300px] rounded-full" />;
@@ -67,8 +89,11 @@ const Chart = () => {
             );
           }}
         >
-          {data.map((entry) => (
-            <Cell key={`cell-${entry.name}`} fill={COLORS[entry.name as keyof typeof COLORS]} />
+          {data.map((entry, idx) => (
+            <Cell
+              key={`cell-${entry.name}`}
+              fill={COLORS[entry.name] || `hsl(${(idx * 53) % 360} 45% 48%)`}
+            />
           ))}
         </Pie>
         <Tooltip

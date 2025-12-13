@@ -271,7 +271,7 @@ export function AddInstrumentDialog({ isOpen, onOpenChange, onSuccess }: AddInst
                   <FormItem>
                     <FormLabel>Equipment ID</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., QC-001" {...field} />
+                      <Input placeholder="e.g., QC-001" autoComplete="off" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -301,7 +301,7 @@ export function AddInstrumentDialog({ isOpen, onOpenChange, onSuccess }: AddInst
                   <FormItem>
                     <FormLabel>Make / Manufacturer</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Mettler Toledo" {...field} />
+                      <Input placeholder="e.g., Mettler Toledo" autoComplete="off" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -314,7 +314,7 @@ export function AddInstrumentDialog({ isOpen, onOpenChange, onSuccess }: AddInst
                   <FormItem>
                     <FormLabel>Model</FormLabel>
                     <FormControl>
-                      <Input placeholder="Model-X100" {...field} />
+                      <Input placeholder="Model-X100" autoComplete="off" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -327,7 +327,7 @@ export function AddInstrumentDialog({ isOpen, onOpenChange, onSuccess }: AddInst
                   <FormItem>
                     <FormLabel>Serial Number</FormLabel>
                     <FormControl>
-                      <Input placeholder="SN-A1B2C3D4" {...field} />
+                      <Input placeholder="SN-A1B2C3D4" autoComplete="off" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -340,7 +340,7 @@ export function AddInstrumentDialog({ isOpen, onOpenChange, onSuccess }: AddInst
                   <FormItem>
                     <FormLabel>Location</FormLabel>
                     <FormControl>
-                      <Input placeholder="Lab A, Room 101" {...field} />
+                      <Input placeholder="Lab A, Room 101" autoComplete="off" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -439,15 +439,15 @@ export function AddInstrumentDialog({ isOpen, onOpenChange, onSuccess }: AddInst
                         <FormField
                           control={form.control}
                           name={`schedules.${index}.vendorName`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Vendor Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Vendor company or contact" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Vendor Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Vendor company or contact" autoComplete="off" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                         />
                       )}
                     </div>
@@ -461,7 +461,7 @@ export function AddInstrumentDialog({ isOpen, onOpenChange, onSuccess }: AddInst
                             <FormItem>
                               <FormLabel>Vendor Contact (email or phone)</FormLabel>
                               <FormControl>
-                                <Input placeholder="optional" {...field} />
+                                <Input placeholder="optional" autoComplete="off" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

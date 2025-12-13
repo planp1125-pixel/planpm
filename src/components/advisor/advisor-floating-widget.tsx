@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Bot, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { AdvisorForm } from './advisor-form';
 import { AdvisorSummaryPanel } from './advisor-summary-panel';
 
 type AdvisorFloatingWidgetProps = {
@@ -13,7 +12,6 @@ type AdvisorFloatingWidgetProps = {
 
 export function AdvisorFloatingWidget({ instrumentId }: AdvisorFloatingWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [view, setView] = useState<'summary' | 'advisor'>('summary');
 
   return (
     <>
@@ -34,33 +32,11 @@ export function AdvisorFloatingWidget({ instrumentId }: AdvisorFloatingWidgetPro
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <div className="px-4 pt-3 flex items-center gap-2">
-              <Button
-                size="sm"
-                variant={view === 'summary' ? 'default' : 'outline'}
-                onClick={() => setView('summary')}
-              >
-                Summary
-              </Button>
-              <Button
-                size="sm"
-                variant={view === 'advisor' ? 'default' : 'outline'}
-                onClick={() => setView('advisor')}
-              >
-                Ask AI
-              </Button>
-            </div>
             <div className="px-4 text-xs text-muted-foreground">
-              {view === 'summary'
-                ? 'Quick counts of overdue, upcoming, partial, and recent completions. Export to PDF from here.'
-                : 'Ask for recommendations or custom summaries (e.g., overdue this week, next due for EQP-123).'}
+              Quick counts of overdue, upcoming, partial, and recent completions. Export to PDF from here.
             </div>
             <div className="p-4 pb-5 max-h-[70vh] overflow-y-auto">
-              {view === 'summary' ? (
-                <AdvisorSummaryPanel />
-              ) : (
-                <AdvisorForm instrumentId={instrumentId} />
-              )}
+              <AdvisorSummaryPanel />
             </div>
           </Card>
         )}

@@ -86,14 +86,6 @@ export const columns = (
       },
     },
     {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) => {
-        const status = row.getValue('status') as string;
-        return <Badge variant={statusVariant[status] || 'default'}>{status}</Badge>;
-      },
-    },
-    {
       accessorKey: 'location',
       header: 'Location',
     },

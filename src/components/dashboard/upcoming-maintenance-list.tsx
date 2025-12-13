@@ -318,7 +318,36 @@ export function UpcomingMaintenanceList() {
       }
       console.log('DEBUG: Combined Events:', combinedEvents); // DEBUG LOG
 
-      setUpcomingSchedules(combinedEvents);
+      // Deduplicate by instrument + type + day, prefer real schedules over virtual
+      const normalizeDay = (dateStr: string) => {
+        const d = new Date(dateStr);
+        return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).getTime();
+      };
+
+      const dedupedMap = new Map<string, EnhancedEvent>();
+      combinedEvents.forEach(event => {
+        const key = `${event.instrumentId}_${event.type}_${normalizeDay(event.dueDate)}`;
+        const existing = dedupedMap.get(key);
+        if (!existing) {
+          dedupedMap.set(key, event);
+          return;
+        }
+        // Prefer non-virtual (real) over virtual
+        const isVirtual = event.id.startsWith('virtual-');
+        const existingVirtual = existing.id.startsWith('virtual-');
+        if (existingVirtual && !isVirtual) {
+          dedupedMap.set(key, event);
+          return;
+        }
+        // If both real, prefer the one with completion info
+        if (!isVirtual && !existingVirtual) {
+          if ((event.completedDate && !existing.completedDate) || (event.maintenanceStatus === 'Completed' && existing.maintenanceStatus !== 'Completed')) {
+            dedupedMap.set(key, event);
+          }
+        }
+      });
+
+      setUpcomingSchedules(Array.from(dedupedMap.values()));
     } catch (err) {
       console.error("Error fetching schedules:", err);
     } finally {
